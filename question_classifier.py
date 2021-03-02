@@ -13,4 +13,5 @@ def test():
   pass
 
 if __name__ == "__main__":
-  pass
+  # yuting
+  a = 1
