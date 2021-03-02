@@ -89,6 +89,14 @@ def tokenization(sents):
     token_of_sent = re.findall(r"[\w']+", sent)
     # todo: more rules to more accurately tokenize the sentences
     token_of_sent = [word.lower() for word in token_of_sent]
+    for idx in range(len(token_of_sent)):
+        if token_of_sent[idx] == 'u' and idx < len(token_of_sent) - 1:
+            if token_of_sent[idx+1] == 's':
+                token_of_sent[idx] = 'u.s.'
+        elif token_of_sent[idx] == 'e' and idx < len(token_of_sent) - 1:
+            if token_of_sent[idx+1] == 'mail' or token_of_sent[idx+1] == 'mails':
+                token_of_sent[idx] = 'email'
+                token_of_sent[idx+1] = 's'
     tokens.append(token_of_sent)
   return tokens
 

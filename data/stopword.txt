@@ -116,3 +116,5 @@ don
 should
 now
 's
+'t
+n't
