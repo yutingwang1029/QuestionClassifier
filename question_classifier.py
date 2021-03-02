@@ -1,7 +1,7 @@
-from utils import preprocessing
+from utils import preprocessing, materialize, get_stopword, remove_stop
 import configparser
 
-config_path = './config.ini'
+global_config_path = './config.ini'
 
 def cmdparser():
   # todo: parse the cmd argument
