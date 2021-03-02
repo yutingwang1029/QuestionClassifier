@@ -1,5 +1,7 @@
-from utils import preprocessing, materialize
+from utils import preprocessing, materialize, get_stopword, remove_stop
 import configparser
+
+global_config_path = './config.ini'
 
 def cmdparser():
   # todo: parse the cmd argument
@@ -13,5 +15,4 @@ def test():
   pass
 
 if __name__ == "__main__":
-  # yuting
-  a = 1
+  pass
