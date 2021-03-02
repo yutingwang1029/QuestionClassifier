@@ -3,25 +3,29 @@ import re
 
 # preprocessing the data
 
-def preprocessing():
+def preprocessing(datapath):
   """
   description:
     preprocess the raw data
+  param:
+    datapath: path to raw data file
   return:
     (x, y): x be list of the tokens list and y be the corresponding label of each token list
   """
-  tempx, y = split_label_sent()
+  tempx, y = split_label_sent(datapath)
   x = tokenization(tempx)
   return x, y
 
-def split_label_sent():
+def split_label_sent(datapath):
   """
   description:
     split the labels and sentences
+  param:
+    datapath: path to raw data file
   return:
     (x, y): x be the sentences and y be the labels
   """
-  with open(utils.data_path, 'r') as f:
+  with open(datapath, 'r') as f:
     raw_string = f.read()
     lines = raw_string.split('\n')
     y = list(map(lambda line: line.split(' ')[0], lines))
@@ -39,7 +43,7 @@ def tokenization(sents):
   """
   tokens = []
   for sent in sents:
-    token_of_sent = re.findall(r"[\w+]", sent)
+    token_of_sent = re.findall(r"[\w']+", sent)
     # todo: more rules to more accurately tokenize the sentences
     tokens.append(token_of_sent)
   return tokens
