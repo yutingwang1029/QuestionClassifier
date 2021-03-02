@@ -10,7 +10,7 @@ def preprocessing(datapath):
     preprocess the raw data
   param:
     datapath: path to raw data file
-  return
+  return:
     (x, y): x be list of the tokens list and y be the corresponding label of each token list
   """
   tempx, y = split_label_sent(datapath)
