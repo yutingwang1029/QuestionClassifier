@@ -42,5 +42,5 @@ def tokenization(sents):
     token_of_sent = re.findall(r"[\w+]", sent)
     # todo: more rules to more accurately tokenize the sentences
     tokens.append(token_of_sent)
-  return tokens
+  return tokensa
 
