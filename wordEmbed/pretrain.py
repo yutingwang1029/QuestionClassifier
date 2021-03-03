@@ -3,7 +3,7 @@ import numpy as np
 import torch.nn as nn
 
 class PreTrainEmbedding(nn.Module):
-  def __init__(self, voc, pretrain_embedding_path):
+  def __init__(self, voc, pretrain_embedding_path, freeze=False):
     super(PreTrainEmbedding, self).__init__()
     embedding_dict = dict() # idx to vector
     next_idx = len(voc.items())
@@ -30,7 +30,7 @@ class PreTrainEmbedding(nn.Module):
     # print(embedding_dict[:10])
     emb_arr = [item[1] for item in embedding_dict]
     self.weight = torch.FloatTensor(emb_arr)
-    self.embedding = torch.nn.Embedding.from_pretrained(self.weight)
+    self.embedding = torch.nn.Embedding.from_pretrained(self.weight, freeze=freeze)
     self.word2idx = voc
   
   def forward(self, x):
