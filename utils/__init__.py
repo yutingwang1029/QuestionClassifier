@@ -13,3 +13,12 @@ def materialize(string, dst):
   """
   with open(dst, 'w') as f:
     f.write(string)
+
+def word2vec(vo, sents):
+  vecs = []
+  for sent in sents:
+    vec = []
+    for word in sent:
+      vec.append(vo[word])
+    vecs.append(vec)
+  return vecs

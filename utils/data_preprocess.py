@@ -34,46 +34,40 @@ def split_label_sent(datapath):
     
     return x, y
 
-# creating list of stop words from Stop_words.txt
+# creating list of stop words from stopwords.txt
 def get_stopword(datapath):
-    STOP_WORDS = []
+    stopwords = []
     with open(datapath) as f:
         for line in f:
-            STOP_WORDS.append(line.strip())
-    return STOP_WORDS
+            stopwords.append(line.strip())
+    return stopwords
 
 #function to remove stop words
-def remove_stop(sent_list, STOP_WORDS):
+def remove_stop(sent_list, stopwords):
     # for removing stop words from dictionary list
     sents = []
     for sent in sent_list:
-        list_without_stop = [word for word in sent if not word in STOP_WORDS]
+        list_without_stop = [word for word in sent if not word in stopwords]
         sents.append(list_without_stop)
     return sents
 
-def create_vocab(sent_list):
-    word_dict = dict()
-    for sent in sent_list:
-        for token in sent:
-            if token not in word_dict:
-                word_dict[token] = 1
-            else:
-                word_dict[token] += 1
-    sort_word_dict = dict(sorted(word_dict.items(), key=lambda item: item[1]))
-    word_idx_dict = dict()
-    idx = 0
-    for item in sort_word_dict:
-        word_idx_dict[item] = idx
-        idx += 1
-    return word_idx_dict
-
-def create_word_enbedding(encoded_sentences):
-    word_vectors = [i for i in range(len(encoded_sentences))]
-    emb_dim = 3
-    for i in range(len(encoded_sentences)):
-        emb_layer = nn.Embedding(len(encoded_sentences[i]), emb_dim)
-        word_vectors[i] = emb_layer(torch.LongTensor(encoded_sentences[i]))
-    return word_vectors
+def create_vocab(sents, stopword_path):
+  stopword_list = get_stopword(stopword_path)
+  sent_list = remove_stop(sents, stopword_list)
+  word_dict = dict()
+  for sent in sent_list:
+    for token in sent:
+      if token not in word_dict:
+        word_dict[token] = 1
+      else:
+        word_dict[token] += 1
+  sort_word_dict = dict(sorted(word_dict.items(), key=lambda item: item[1]))
+  word_idx_dict = dict()
+  idx = 0
+  for item in sort_word_dict:
+    word_idx_dict[item] = idx
+    idx += 1
+  return word_idx_dict, sent_list
 
 def tokenization(sents):
   """

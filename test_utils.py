@@ -11,17 +11,15 @@ def test_utils():
   config.read(global_config_path)
   stopword_path = config["GENERAL"]["stop_word_path"]
   datapath = config["GENERAL"]["test_path"]
-  x, y = preprocessing(datapath)
-  stopword_list = get_stopword(stopword_path)
-  sents = remove_stop(x, stopword_list)
-  vo = create_vocab(sents)
+  sents, _ = preprocessing(datapath)
+  vo, sents = create_vocab(sents, stopword_path)
+  print(sents)
   vecs = []
   for sent in sents:
       vec = []
       for token in sent:
         vec.append(vo[token])
       vecs.append(vec)
-  #print(vecs[0])
   randomVec = wordEmbed.RandomWordVec()
   for i in range(len(vecs)):
     input = torch.LongTensor(vecs[i])
