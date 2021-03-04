@@ -1,7 +1,5 @@
 from .data_preprocess import *
 
-from config import data_path
-
 def materialize(string, dst):
   """
   description:

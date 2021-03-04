@@ -20,10 +20,20 @@ def test_utils():
       for token in sent:
         vec.append(vo[token])
       vecs.append(vec)
-  randomVec = wordEmbed.RandomWordVec()
+  randomVec = wordEmbed.RandomWordVec(bow=False)
   for i in range(len(vecs)):
     input = torch.LongTensor(vecs[i])
     print(input)
-    print(randomVec.forward(input))
+    temp = randomVec.forward(input)
+    sum_of_tensor = temp[0] 
+    for i in range(1, len(temp)):
+      sum_of_tensor += temp[i]
+    sum_of_tensor /= len(temp)
+    print(sum_of_tensor)
+  # for i in range(len(vecs)):
+  #   input = torch.LongTensor(vecs[i])
+  #   print(input)
+  #   temp = randomVec.forward(input)
+  #   print(temp)
 
 test_utils()
