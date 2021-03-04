@@ -15,9 +15,15 @@ def test_embedding():
   x, _ = utils.preprocessing(datapath)
   vo, sents = utils.create_vocab(x, stopword_path)
   vecs = utils.word2vec(vo, sents)
+  print(sents[0])
   pretrainVecLayer = wordEmbed.PreTrainEmbedding(vo, pretrain_embedding_path=pretrain_path)
   result = pretrainVecLayer.forward(torch.LongTensor([vecs[0]]))
   print(result)
+  # mock bag of word
+  pretrainVecLayer_nobow = wordEmbed.PreTrainEmbedding(vo, pretrain_embedding_path=pretrain_path, bow=False)
+  temp = pretrainVecLayer_nobow.forward(torch.LongTensor([vecs[0]]))
+  temp = torch.sum(temp, 1) / len(vecs[0])
+  print(temp)
 
 
 test_embedding()
