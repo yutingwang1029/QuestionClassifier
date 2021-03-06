@@ -6,9 +6,10 @@ class PreTrainEmbedding(nn.Module):
   def __init__(self, voc, pretrain_embedding_path, freeze=False, bow=True):
     super(PreTrainEmbedding, self).__init__()
     embedding_dict = dict() # idx to vector
-    next_idx = len(voc.items())
+    next_idx = len(voc.items()) + 1
     for item in voc.items():
       embedding_dict[item[1]] = np.array([])
+    embedding_dict[0] = np.array([])
     with open(pretrain_embedding_path, 'r') as f:
       lines = f.read()
       lines = lines.split('\n')
