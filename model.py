@@ -40,7 +40,8 @@ class QuestionClassifier(nn.Module):
     self.bow = bow
     self.max_len = bilstm_max_len
     self.voc = voc
-    self.bilstm = BiLSTM(bilstm_input_dim, bilstm_hidden_dim, nn_input_dim, bilstm_max_len)
+    if bow == False:
+      self.bilstm = BiLSTM(bilstm_input_dim, bilstm_hidden_dim, nn_input_dim, bilstm_max_len)
     self.classifier = NeuralNetworkClassifier(nn_input_dim, nn_hidden_dim, nn_output_size)
   
   def forward(self, x):
@@ -57,4 +58,6 @@ class QuestionClassifier(nn.Module):
       sent_vecs = self.bilstm(emb, len_tensor)
       return self.classifier(sent_vecs)
     else:
-      return self.classifier(emb)
+      # print(emb)
+      ret = self.classifier(emb)
+      return ret

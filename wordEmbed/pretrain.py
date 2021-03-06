@@ -9,7 +9,7 @@ class PreTrainEmbedding(nn.Module):
     next_idx = len(voc.items()) + 1
     for item in voc.items():
       embedding_dict[item[1]] = np.array([])
-    embedding_dict[0] = np.array([])
+    embedding_dict[0] = np.array([0 for i in range(300)])
     with open(pretrain_embedding_path, 'r') as f:
       lines = f.read()
       lines = lines.split('\n')

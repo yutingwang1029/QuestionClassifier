@@ -1,2 +1,16 @@
 LOC:state What sprawling U.S. state boasts the most airports ?
-DESC:manner What do I e-mail someone at aol.com from yahoo.com ?
+DESC:manner How do I e-mail someone at aol.com from yahoo.com ?
+LOC:country What country has the most coastline ?
+LOC:state What two states is Washington D.C. between ?
+NUM:date In what year did Joe DiMaggio compile his 56-game hitting streak ?
+NUM:date What year was the setting for American Graffiti ?
+NUM:date When did the art of quilting begin ?
+DESC:reason Why are eggs supposed to be stored small end down ?
+ENTY:other What must be exceeded to produce a sonic boom ?
+ENTY:dismed What is a fear of fish ?
+NUM:money How much did the Iran-Contra investigation cost ?
+DESC:def What does the double-O indicate in 007 ?
+HUM:ind What Argentine revolutionary fought with Castro and died in Bolivia in May , 1979 ?
+LOC:other What botanical marvel did Nebuchadnezzar build ?
+ENTY:food What 's known as The queen of Drinks ?
+HUM:ind What famous comic strip character died of acne ?
