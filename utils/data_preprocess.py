@@ -63,7 +63,7 @@ def create_vocab(sents, stopword_path):
         word_dict[token] += 1
   sort_word_dict = dict(sorted(word_dict.items(), key=lambda item: item[1]))
   word_idx_dict = dict()
-  idx = 0
+  idx = 1
   for item in sort_word_dict:
     word_idx_dict[item] = idx
     idx += 1
@@ -94,3 +94,27 @@ def tokenization(sents):
     tokens.append(token_of_sent)
   return tokens
 
+def padding(sents, max_len):
+  """
+  description:
+    padding the original sentences
+  params:
+    sents: list of sentences
+    max_len: padding length
+  return:
+    new_sents: padded sentences
+    origin_lens: the length of the original sentences
+  """
+  new_sents = []
+  origin_lens = []
+  for sent in sents:
+    origin_lens.append(len(sent))
+    if len(sent) < max_len:
+      gap = max_len - len(sent)
+      new_sent = [i for i in sent]
+      for _i in range(gap):
+        new_sent.append(0)
+      new_sents.append(new_sent)
+    else:
+      new_sents.append(sent)
+  return new_sents, origin_lens

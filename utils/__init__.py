@@ -1,4 +1,5 @@
 from .data_preprocess import *
+from .tag_encoding import *
 
 def materialize(string, dst):
   """
