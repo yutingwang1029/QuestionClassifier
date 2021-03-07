@@ -28,7 +28,6 @@ class PreTrainEmbedding(nn.Module):
       if len(embedding_dict[key]) == 0:
         embedding_dict[key] = unk_embedding
     embedding_dict = list(sorted(embedding_dict.items(), key=lambda x: x[0]))
-    # print(embedding_dict[:10])
     emb_arr = [item[1] for item in embedding_dict]
     self.weight = torch.FloatTensor(emb_arr)
     self.bow = bow

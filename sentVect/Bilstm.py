@@ -47,6 +47,6 @@ class BiLSTM(nn.Module):
         sentence_batch = self.bi_fetch(sen_rnn, sen_lengths, batch_size, self.sen_len)
         representation = sentence_batch
         out = self.linear(representation)
-        out_prob = F.softmax(out.view(batch_size, -1), dim=1)
+        # out_prob = F.softmax(out.view(batch_size, -1), dim=1)
 
-        return out_prob
+        return out

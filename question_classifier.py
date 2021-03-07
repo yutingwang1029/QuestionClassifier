@@ -20,7 +20,7 @@ def train_val(model, test_x, test_y):
   y_real = list()
   with torch.no_grad():
     for j in range(len(test_x)):
-      predict = model([test_x[0]])
+      predict = model([test_x[j]])
       y_preds.extend(predict.argmax(dim=1).numpy().tolist())
       y_real.extend([test_y[j]])
   return np.sum(np.array(y_preds)==y_real)/len(y_real)
@@ -36,13 +36,14 @@ def train(config, voc, label_num, dataloader):
     bilstm_hidden_dim=config['bilstm_hidden_dim'],
     bilstm_max_len=config['bilstm_max_len'],
     nn_input_dim=config['nn_input_dim'],
-    nn_hidden_dim=config['nn_hidden_dim'],
+    nn_hidden_dim_1=config['nn_hidden_dim_1'],
+    nn_hidden_dim_2=config['nn_hidden_dim_2'],
     nn_output_size=label_num
   )
   print(model)
   test_x, test_y = dataloader.get_test_data()
   test_y = test_y
-  optimizer = optim.SGD(model.parameters(), lr=float(config['lr']))
+  optimizer = optim.SGD(model.parameters(), lr=float(config['lr']), weight_decay=float(config['lr']))
   criterion = nn.CrossEntropyLoss()
   model.train()
   for i in range(int(config['epoches'])):
@@ -55,10 +56,10 @@ def train(config, voc, label_num, dataloader):
       loss = criterion(probs, labels)
       loss.backward()
       optimizer.step()
-    if i % 5 == 0:
-      print(f"----- epoch {i} -----")
-      acc = train_val(model, test_x, test_y)
-      print(f"epoch {i} finished, acc: {acc}")
+    # if i % 5 == 0 or i == int(config['epoches']) - 1:
+    print(f"----- epoch {i} -----")
+    acc = train_val(model, test_x, test_y)
+    print(f"epoch {i} finished, acc: {acc}")
   return model
 
 def test():
