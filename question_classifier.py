@@ -2,7 +2,7 @@ import configparser
 import torch.optim as optim
 from model import QuestionClassifier
 import torch.nn as nn
-from sklearn.metrics import mean_squared_error
+#from sklearn.metrics import mean_squared_error
 from config import get_config
 import utils
 import torch

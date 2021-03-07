@@ -61,7 +61,11 @@ def create_vocab(sents, stopword_path):
         word_dict[token] = 1
       else:
         word_dict[token] += 1
-  sort_word_dict = dict(sorted(word_dict.items(), key=lambda item: item[1]))
+  word_dict_Ktimes=dict()
+  for k,v in word_dict.items():
+      if v>= 5: #the time of a word occurs
+          word_dict_Ktimes[k]=v
+  sort_word_dict = dict(sorted(word_dict_Ktimes.items(), key=lambda item: item[1]))
   word_idx_dict = dict()
   idx = 1
   for item in sort_word_dict:

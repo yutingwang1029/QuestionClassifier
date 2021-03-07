@@ -18,6 +18,7 @@ def word2vec(vo, sents):
   for sent in sents:
     vec = []
     for word in sent:
-      vec.append(vo[word])
+        if word in vo:
+            vec.append(vo[word])
     vecs.append(vec)
   return vecs
