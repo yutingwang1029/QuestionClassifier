@@ -40,3 +40,6 @@ class DataLoader:
       self.pointer = (self.pointer + self.batch_size) % self.length
       return self.train_x[old_pointer:], \
         get_tags(self.train_y[old_pointer:], self.label2idx)
+  
+  def get_all(self):
+    return self.train_x, get_tags(self.train_y, self.label2idx)

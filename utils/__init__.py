@@ -18,7 +18,9 @@ def word2vec(vo, sents):
   for sent in sents:
     vec = []
     for word in sent:
-        if word in vo:
-            vec.append(vo[word])
+      if word in vo:
+        vec.append(vo[word])
+      else:
+        vec.append(vo["#UNK#"])
     vecs.append(vec)
   return vecs

@@ -15,6 +15,10 @@ def cmdparser():
   # todo: parse the cmd argument
   pass
 
+def test_trec(model):
+  test_x, test_y = trec_loader.get_all()
+  return train_val(model, test_x, test_y)
+
 def train_val(model, test_x, test_y):
   y_preds = list()
   y_real = list()
@@ -57,18 +61,28 @@ def train(config, voc, label_num, dataloader):
       loss.backward()
       optimizer.step()
     # if i % 5 == 0 or i == int(config['epoches']) - 1:
-    print(f"----- epoch {i} -----")
+    print(f"----- epoch {i+1} -----")
     acc = train_val(model, test_x, test_y)
-    print(f"epoch {i} finished, acc: {acc}")
+    acc_trec = test_trec(model)
+    print(f"epoch {i+1} finished, validation acc: {acc}, TREC 10 acc: {acc_trec}")
   return model
 
 def test():
   pass
 
+trec_loader = None
+
 if __name__ == "__main__":
   config_dict = get_config(global_config_path)
+
+  test_x, test_y = utils.preprocessing(config_dict['trec_path'])
+  stopwords = utils.get_stopword(config_dict['stop_word_path'])
+  test_sents = utils.remove_stop(test_x, stopwords)
+
   x, y = utils.preprocessing(config_dict['data_path'])
   voc, sents = utils.create_vocab(x, config_dict['stop_word_path'])
   label2idx, _ = utils.get_label_dict(y)
   dataloader = DataLoader(sents, y, int(config_dict['batch_size']), shuffle=True, test_ratio=0.2, label2idx=label2idx)
+  
+  trec_loader = DataLoader(test_sents, test_y, 0, True, 0, label2idx)
   train(config_dict, voc, len(label2idx), dataloader)
