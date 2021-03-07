@@ -13,23 +13,24 @@ def test_utils():
   datapath = config["GENERAL"]["test_path"]
   sents, _ = preprocessing(datapath)
   vo, sents = create_vocab(sents, stopword_path)
-  print(sents)
+  print(vo)
   vecs = []
   for sent in sents:
       vec = []
       for token in sent:
-        vec.append(vo[token])
+          if token in vo:
+            vec.append(vo[token])
       vecs.append(vec)
   randomVec = wordEmbed.RandomWordVec(bow=False)
   for i in range(len(vecs)):
     input = torch.LongTensor(vecs[i])
-    print(input)
+    #print(input)
     temp = randomVec.forward(input)
     sum_of_tensor = temp[0] 
     for i in range(1, len(temp)):
       sum_of_tensor += temp[i]
     sum_of_tensor /= len(temp)
-    print(sum_of_tensor)
+    #print(sum_of_tensor)
   # for i in range(len(vecs)):
   #   input = torch.LongTensor(vecs[i])
   #   print(input)
