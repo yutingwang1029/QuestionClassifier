@@ -16,6 +16,8 @@ def test():
 
 if __name__ == "__main__":
   config = configparser.ConfigParser()
-  config.read(config_path)
+  config.read(global_config_path)
   datapath = config["GENERAL"]["data_path"]
+  testpath = config["GENERAL"]["test_path"]
   x, _ = preprocessing(datapath)
+  print(x)

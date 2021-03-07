@@ -59,13 +59,20 @@ def create_vocab(sent_list):
                 word_dict[token] = 1
             else:
                 word_dict[token] += 1
-    sort_word_dict = dict(sorted(word_dict.items(), key=lambda item: item[1]))
+    word_dict_Ktimes = dict()
+    for k, v in word_dict.items():
+        if v >= 100: #单词出现的次数
+            word_dict_Ktimes[k] = v    
+    sort_word_dict = dict(sorted(word_dict_Ktimes.items(), key=lambda item: item[1]))
+
     word_idx_dict = dict()
     idx = 0
     for item in sort_word_dict:
         word_idx_dict[item] = idx
         idx += 1
     return word_idx_dict
+    #return word_dict_Ktimes
+    #return word_dict
 
 def create_word_enbedding(encoded_sentences):
     word_vectors = [i for i in range(len(encoded_sentences))]
