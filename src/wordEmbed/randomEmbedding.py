@@ -15,10 +15,10 @@ class RandomWordVec(nn.Module):
             self.embedding = nn.EmbeddingBag(voc_size+1, dim, mode='mean')
 
     def forward(self, x):
-        if x.shape[0] == 1:
-            offset = torch.LongTensor([0])
-            temp = self.embedding(x[0], offset)
-            return torch.Tensor(temp)
+        # if x.shape[0] == 1:
+        #     offset = torch.LongTensor([0])
+        #     temp = self.embedding(x[0], offset)
+        #     return torch.Tensor(temp)
         # print(x)
         return self.embedding(x)
   

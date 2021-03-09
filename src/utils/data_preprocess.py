@@ -71,6 +71,7 @@ def create_vocab(sents, stopword_path):
   for item in sort_word_dict:
     word_idx_dict[item] = idx
     idx += 1
+  word_idx_dict['#UNK#'] = idx
   return word_idx_dict, sent_list
 
 def tokenization(sents):
