@@ -17,6 +17,7 @@ def cmdparser():
   parser.add_argument('--dev', action="store_true", help='dev training mode without saving the model')
   parser.add_argument('--train', action="store_true", help='train and save the model')
   parser.add_argument('--test', action="store_true", help='test existing model')
+  parser.add_argument('--search', action='store_true', help="searching for hyper-params")
   parser.add_argument('--config', type=str, default=global_config_path, help="configuration path")
   args = parser.parse_args()
   return args
@@ -106,6 +107,49 @@ def train(config, voc, label_num, dataloader, trec_loader, mode='dev'):
     torch.save(best_model, config['model_path'])
   return best_model, best_trec_acc
 
+def cross_product(arr1, arr2):
+  ret = []
+  for item1 in arr1:
+    for item2 in arr2:
+      if isinstance(item1, list):
+        temp = [ele for ele in item1]
+      else:
+        temp = [item1]
+      temp.append(item2)
+      ret.append(temp)
+  return ret
+
+def grid_search(config, voc, label_num, dataloader, trec_loader):
+  lrs = [0.01, 0.011, 0.0115, 0.012]
+  bilstm_hiddens = [5, 10, 15, 20, 25, 30]
+  nn_input_dims = [50, 80, 100, 150, 200]
+  nn_hidden_dims = [20, 40, 50, 60, 100, 150]
+
+  t1 = cross_product(lrs, bilstm_hiddens)
+  t2 = cross_product(t1, nn_input_dims)
+  t3 = cross_product(t2, nn_hidden_dims)
+
+  result = []
+  for setting in t3:
+    new_config = copy.deepcopy(config)
+    new_config['lr'] = setting[0]
+    new_config['bilstm_hidden'] = setting[1]
+    new_config['nn_input_dim'] = setting[2]
+    new_config['nn_hidden_dim'] = setting[3]
+
+    result.append([s for s in setting])
+
+    _, trec_acc = train(new_config, voc, label_num, dataloader, trec_loader, mode='train')
+    result[-1].append(trec_acc)
+    print(result)
+    title = 'lr,bilstm_hidden,nn_input_dim,nn_hidden_dim,acc\n'
+    with open('./temp.csv', 'w') as f:
+      string = ''
+      for line in result:
+        new_string = ','.join(list(map(lambda x: str(x), line)))
+        string += new_string + '\n'
+      f.write(title+string)
+
 def test(config, voc, label_num, trec_loader, idx2label):
   model = QuestionClassifier(
     ensemble=int(config['ensemble_size']),
@@ -149,7 +193,6 @@ if __name__ == "__main__":
   sents = utils.remove_stop(x, stopwords)
 
   label2idx, idx2label = utils.get_label_dict(y)
-  # print(label2idx, idx2label)
   trec_loader = DataLoader(test_sents, test_y, 0, False, 0, label2idx)
 
   if args.dev:
@@ -160,3 +203,6 @@ if __name__ == "__main__":
     train(config_dict, voc, len(label2idx), dataloader, trec_loader, mode='train')
   if args.test:
     test(config_dict, voc, len(label2idx), trec_loader, idx2label)
+  if args.search:
+    dataloader = DataLoader(sents, y, int(config_dict['batch_size']), shuffle=False, test_ratio=0.0, label2idx=label2idx)
+    grid_search(config_dict, voc, len(label2idx), dataloader, trec_loader)
