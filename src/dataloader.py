@@ -1,7 +1,7 @@
 import random
 from utils import get_label_vecs, get_tags
 
-random.seed(1)
+random.seed(3)
 
 class DataLoader:
   def __init__(self, x, y, batch_size, shuffle=True, test_ratio=0.1, label2idx={}):

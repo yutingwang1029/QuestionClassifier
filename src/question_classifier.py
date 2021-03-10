@@ -89,7 +89,7 @@ def train(config, voc, label_num, dataloader, trec_loader, mode='dev'):
         if early_stopping >= int(config['early_stopping']):
           print(f'dev training early stopping at epoch {i+1}')
           return model
-    if i >= 4:
+    if i >= 3:
       scheduler.step()
     print(f"----- epoch {i+1} -----")
     if mode == 'dev':
@@ -143,7 +143,7 @@ def grid_search(config, voc, label_num, dataloader, trec_loader):
     result[-1].append(trec_acc)
     print(result)
     title = 'lr,bilstm_hidden,nn_input_dim,nn_hidden_dim,acc\n'
-    with open('./temp.csv', 'w') as f:
+    with open('./temp1.csv', 'w') as f:
       string = ''
       for line in result:
         new_string = ','.join(list(map(lambda x: str(x), line)))
