@@ -1,46 +1,49 @@
-import random
-from utils import get_label_vecs, get_tags
-
-random.seed(3)
+import torch
 
 class DataLoader:
-  def __init__(self, x, y, batch_size, shuffle=True, test_ratio=0.1, label2idx={}):
-    temp = list(zip(x, y))
-    if shuffle:
-      random.shuffle(temp)
-    nx, ny = zip(*temp)
-    nx = list(nx)
-    ny = list(ny)
-    
-    self.total_length = len(nx)
-    self.test_length = int(self.total_length * test_ratio)
+  def __init__(self, vocabulary, labels, stop_words, train_set):
+    self.vocabulary = vocabulary
+    self.labels = labels
+    self.stop_words = stop_words
+    self.train_set = train_set
+    self.pt = 0
+    self.length = len(train_set)
 
-    self.test_x = nx[self.total_length-self.test_length:]
-    self.test_y = ny[self.total_length-self.test_length:]
-    self.train_x = nx[:self.total_length-self.test_length]
-    self.train_y = ny[:self.total_length-self.test_length]
+  def get_sent_offset(self, feature, label, labels, vocabulary, stop_words):
+    # label, feature = sent
+    label = torch.LongTensor([labels.index(label)])
+    offset = []
+    feature = feature.lower()
+    for word in feature.split():
+      if word in stop_words:
+        continue
+      if word in vocabulary:
+        offset.append(vocabulary.index(word))
+      else:
+        offset.append(vocabulary.index('#unk#'))
+    return torch.LongTensor(offset).unsqueeze(-2), label
 
-    self.length = len(self.train_x)
-    
-    self.label2idx = label2idx
-    self.batch_size = batch_size
-    self.pointer = 0
-  
-  def get_test_data(self):
-    return self.test_x, get_tags(self.test_y, self.label2idx)
-  def get_length(self):
-    return 2*self.length
-  def next_batch(self):
-    old_pointer = self.pointer
-    if self.pointer + self.batch_size < self.length:
-      self.pointer += self.batch_size
-      return \
-        self.train_x[old_pointer:self.pointer], \
-        get_tags(self.train_y[old_pointer:self.pointer], self.label2idx)
+  def get_batch(self):
+    if self.pt + 1 < self.length:
+      label, feat = self.train_set[self.pt:self.pt+1][0]
+      feat, label = self.get_sent_offset(
+                        feat,
+                        label,
+                        self.labels,
+                        self.vocabulary,
+                        self.stop_words
+                      )
+      self.pt += 1
+      return feat, label
     else:
-      self.pointer = (self.pointer + self.batch_size) % self.length
-      return self.train_x[old_pointer:], \
-        get_tags(self.train_y[old_pointer:], self.label2idx)
-  
-  def get_all(self):
-    return self.train_x, get_tags(self.train_y, self.label2idx)
+      self.pt = 0
+      label, feat = self.train_set[self.pt:self.pt+1][0]
+      feat, label = self.get_sent_offset(
+                        feat,
+                        label,
+                        self.labels,
+                        self.vocabulary,
+                        self.stop_words
+                      )
+      self.pt += 1
+      return feat, label

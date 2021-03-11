@@ -1,1 +1,2 @@
-from .Bilstm import BiLSTM
+from .bilstm import *
+from .bow import *

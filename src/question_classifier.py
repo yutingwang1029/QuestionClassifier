@@ -1,14 +1,12 @@
-import configparser
-import torch.optim as optim
-from model import QuestionClassifier
-import torch.nn as nn
-from config import get_config
-import utils
 import torch
-from dataloader import DataLoader
 import numpy as np
+import random
+import re
 import argparse
-import copy
+import utils
+from model import QuestionClassifier
+from dataloader import DataLoader
+from config import get_config
 
 global_config_path = './config.ini'
 
@@ -21,228 +19,142 @@ def cmdparser():
   parser.add_argument('--config', type=str, default=global_config_path, help="configuration path")
   args = parser.parse_args()
   return args
+
+def test_trec(model, dataloader):
+  acc = 0
+  reals, preds = [], []
+  for _i in range(dataloader.length):
+    feat, label = dataloader.get_batch()
+    output = model(feat)
+    _, pred = torch.max(output.data, 1)
+    reals.append(label)
+    preds.append(pred)
+    if label == pred:
+      acc += 1
+  acc_rate = float(acc) / float(dataloader.length)
+  return acc_rate, reals, preds
+
+def train(config, vocabulary, labels, stop_words, save_path='', mode='dev'):
+  if config['from_pretrain'] == 'True':
+    pretrain_dict = utils.load_pre_train(config['pretrain_embedding_path'])
+    pretrain_weight = utils.create_word_embedding(pretrain_dict, vocabulary)
+    embedding_dim = len(pretrain_weight[0])
+  else:
+    pretrain_weight = [0]
+    embedding_dim = int(config['embedding_dim'])
   
-def test_trec(model, trec_loader):
-  test_x, test_y = trec_loader.get_all()
-  ret, y_preds, y_real = train_val(model, test_x, test_y)
-  return ret, y_preds, y_real
-
-def train_val(model, test_x, test_y):
-  y_preds = list()
-  y_real = list()
-  with torch.no_grad():
-    for j in range(len(test_x)):
-      predict = model([test_x[j]])
-      y_preds.extend(predict.argmax(dim=1).numpy().tolist())
-      y_real.extend([test_y[j]])
-  return np.sum(np.array(y_preds)==y_real)/len(y_real), y_preds, y_real
-
-def train(config, voc, label_num, dataloader, trec_loader, save_path='', mode='dev'):
   model = QuestionClassifier(
     bow=config['bow'] == 'True',
     bilstm=config['bilstm'] == 'True',
-    voc=voc,
-    pretrain_embedding_path=config['pretrain_embedding_path'],
+    vocab_size=len(vocabulary),
+    embedding_dim=embedding_dim,
+    from_pretrain=config['from_pretrain'] == 'True',
+    pre_train_weight=torch.FloatTensor(pretrain_weight),
     freeze=config['freeze'] == 'True',
-    random_or_word2vec=config['random_or_word2vec'],
-    bilstm_input_dim=config['bilstm_input_dim'],
-    bilstm_hidden_dim=config['bilstm_hidden_dim'],
-    bilstm_max_len=config['bilstm_max_len'],
-    nn_input_dim=config['nn_input_dim'],
-    nn_hidden_dim_1=config['nn_hidden_dim_1'],
-    nn_hidden_dim_2=config['nn_hidden_dim_2'],
-    nn_output_size=label_num
+    bilstm_hidden_dim=int(config['bilstm_hidden_dim']),
+    input_dim=int(config['input_dim']),
+    hidden_dim=int(config['hidden_dim']),
+    output_dim=len(labels)
   )
   print(model)
-  test_x, test_y = dataloader.get_test_data()
-  optimizer = optim.SGD(
-    model.parameters(), 
-    lr=float(config['lr']),
-    weight_decay=float(config['lr'])
-  )
-  scheduler = optim.lr_scheduler.StepLR(
-    optimizer, 
-    step_size=float(config['lr_decay_step']), 
-    gamma=float(config['lr_decay_rate'])
-  )
-  criterion = nn.CrossEntropyLoss()
-  early_stopping = 0
-  best_val_acc = 0.0
-  best_trec_acc = 0.0
-  best_model = copy.deepcopy(model.state_dict())
-  model.train()
-  for i in range(int(config['epoches'])):
-    batches = dataloader.get_length() // int(config['batch_size'])
-    for _j in range(batches):
-      features, labels = dataloader.next_batch()
-      labels = torch.LongTensor(labels)
+  loss_function = torch.nn.CrossEntropyLoss()
+  optimizer = torch.optim.Adam(model.parameters(), lr=float(config['lr']))
+  if mode == 'dev':
+    train_set = utils.load_data(config['train_path'])
+    val_set = utils.load_data(config['dev_path'])
+    val_loader = DataLoader(vocabulary, labels, stop_words, val_set)
+  else:
+    train_set = utils.load_data(config['raw_path'])
+  test_set = utils.load_data(config['test_path'])
+  train_loader = DataLoader(vocabulary, labels, stop_words, train_set)
+  test_loader = DataLoader(vocabulary, labels, stop_words, test_set)
+
+  for i in range(int(config['epochs'])):
+    error = 0
+    steps= train_loader.length // int(config['batch_size'])
+    for _ in range(steps):
+      feat, target = train_loader.get_batch()
       optimizer.zero_grad()
-      probs = model(features)
-      loss = criterion(probs, labels)
+      preds = model(feat)
+      loss = loss_function(preds, target)
+      error += loss.item()
       loss.backward()
       optimizer.step()
-      if mode == 'dev':
-        new_val_acc, _, _ = train_val(model, test_x, test_y)
-        if new_val_acc > best_val_acc:
-          early_stopping = 0
-          best_val_acc = new_val_acc
-        if early_stopping >= int(config['early_stopping']):
-          print(f'dev training early stopping at epoch {i+1}')
-          return model
-    if i >= 3:
-      scheduler.step()
-    print(f"----- epoch {i+1} -----")
-    if mode == 'dev':
-      acc, _, _ = train_val(model, test_x, test_y)
-      acc_trec, _, _ = test_trec(model, trec_loader)
-      best_trec_acc = acc_trec if acc_trec > best_trec_acc else best_trec_acc
-      print(f"epoch {i+1} finished, validation acc: {acc}, TREC 10 acc: {acc_trec}")
-    else:
-      acc_trec, _, _ = test_trec(model, trec_loader)
-      if best_trec_acc < acc_trec:
-        best_trec_acc = acc_trec
-        best_model = copy.deepcopy(model.state_dict())
-      print(f"epoch {i+1} finished, TREC 10 acc: {acc_trec}, best TREC 10 acc: {best_trec_acc} lr: {scheduler.get_last_lr()[0]}")
+    if mode == 'train':
+      trec_acc, _, _ = test_trec(model, test_loader)
+      print(f'--- epoch {i+1} ---')
+      print(f'loss: {error / len(train_set)}, TREC acc: {trec_acc}')
+    elif mode == 'dev':
+      val_acc, _, _ = test_trec(model, val_loader)
+      trec_acc, _, _ = test_trec(model, test_loader)
+      print(f'--- epoch {i+1} ---')
+      print(f'loss: {error / len(train_set)}, validation acc: {val_acc}, TREC acc: {trec_acc}')
   if mode == 'train' and save_path != '':
-    torch.save(best_model, save_path)
-  return best_model, best_trec_acc
+    torch.save(model.state_dict(), save_path)
+  return model
 
-def cross_product(arr1, arr2):
-  ret = []
-  for item1 in arr1:
-    for item2 in arr2:
-      if isinstance(item1, list):
-        temp = [ele for ele in item1]
-      else:
-        temp = [item1]
-      temp.append(item2)
-      ret.append(temp)
-  return ret
-
-def grid_search(config, voc, label_num, dataloader, trec_loader):
-  lrs = [0.01, 0.011, 0.0115, 0.012]
-  # bilstm_hiddens = [5, 10, 15, 20, 25, 30]
-  # nn_input_dims = [50, 80, 100, 150, 200]
-  nn_hidden_dims = [50, 80, 100, 150, 200]
-  nn_hidden_dim2s = [50, 80, 100, 150, 200]
-  # nn_hidden_dims = [10 * i for i in range(1, 20)]
-  # t3 = nn_hidden_dims
-  # lrs = [0.01]
-  # bilstm_hiddens = [5]
-  # nn_input_dims = [50]
-  # nn_hidden_dims = [40,50]
-  t1 = lrs
-  # t1 = cross_product(lrs, bilstm_hiddens)
-  t2 = cross_product(t1, nn_hidden_dims)
-  t3 = cross_product(t2, nn_hidden_dim2s)
-
-  result = []
-  for setting in t3:
-    new_config = copy.deepcopy(config)
-    new_config['lr'] = setting[0]
-    # new_config['bilstm_hidden_dim'] = setting[1]
-    # new_config['nn_input_dim'] = setting[2]
-    # new_config['nn_hidden_dim_1'] = setting[3]
-    new_config['nn_hidden_dim_1'] = setting[1]
-    new_config['nn_hidden_dim_2'] = setting[2]
-    # result.append([s for s in setting])
-    result.append([s for s in setting])
-
-    new_dataloader = copy.deepcopy(dataloader)
-    new_trecloader = copy.deepcopy(trec_loader)
-    _, trec_acc = train(new_config, voc, label_num, new_dataloader, new_trecloader, mode='train')
-    result[-1].append(trec_acc)
-    print(result)
-    title = 'lr,bilstm_hidden,nn_input_dim,nn_hidden_dim,acc\n'
-    with open('./temp1.csv', 'w') as f:
-      string = ''
-      for line in result:
-        new_string = ','.join(list(map(lambda x: str(x), line)))
-        string += new_string + '\n'
-      f.write(title+string)
-
-def test(config, voc, label_num, trec_loader, idx2label):
+def test(config, vocabulary, labels, stop_words, save_path=''):
+  if config['from_pretrain'] == 'True':
+    pretrain_dict = utils.load_pre_train(config['pretrain_embedding_path'])
+    pretrain_weight = utils.create_word_embedding(pretrain_dict, vocabulary)
+    embedding_dim = len(pretrain_weight[0])
+  else:
+    pretrain_weight = [0]
+    embedding_dim = int(config['embedding_dim'])
+  
   model = QuestionClassifier(
     bow=config['bow'] == 'True',
     bilstm=config['bilstm'] == 'True',
-    voc=voc,
-    pretrain_embedding_path=config['pretrain_embedding_path'],
+    vocab_size=len(vocabulary),
+    embedding_dim=embedding_dim,
+    from_pretrain=config['from_pretrain'] == 'True',
+    pre_train_weight=torch.FloatTensor(pretrain_weight),
     freeze=config['freeze'] == 'True',
-    random_or_word2vec=config['random_or_word2vec'],
-    bilstm_input_dim=config['bilstm_input_dim'],
-    bilstm_hidden_dim=config['bilstm_hidden_dim'],
-    bilstm_max_len=config['bilstm_max_len'],
-    nn_input_dim=config['nn_input_dim'],
-    nn_hidden_dim_1=config['nn_hidden_dim_1'],
-    nn_output_size=label_num
+    bilstm_hidden_dim=int(config['bilstm_hidden_dim']),
+    input_dim=int(config['input_dim']),
+    hidden_dim=int(config['hidden_dim']),
+    output_dim=len(labels)
   )
+  test_set = utils.load_data(config['test_path'])
+  test_loader = DataLoader(vocabulary, labels, stop_words, test_set)
   if int(config['ensemble_size']) == 1:
     model.load_state_dict(torch.load(config['model_path']))
     model.eval()
-    trec_acc, final_preds, _ = test_trec(model, trec_loader)
-  else:
-    y_preds = []
-    y_real = []
-    final_preds = []
-    weight = []
-    for i in range(config['ensemble_size']):
-      model.load_state_dict(torch.load(config[f'model_path_{i+1}']))
-      model.eval()
-      trec_acc, y_pred_temp, y_real = test_trec(model, trec_loader)
-      for idx in range(len(y_pred_temp)):
-        if len(y_preds) <= idx:
-          y_preds.append([y_pred_temp[idx]])
-          weight.append([trec_acc])
-        else:
-          y_preds[idx].append(y_pred_temp[idx])
-          weight[idx].append(trec_acc)
-    y_real = np.array(y_real)
-    for idx in range(len(y_preds)):
-      votes = dict([[i, 0] for i in range(len(y_real))])
-      for j in range(len(y_preds[idx])):
-        votes[y_preds[idx][j]] += weight[idx][j]
-      final_preds.append(list(sorted(votes.items(), key=lambda x: x[1], reverse=True))[0][0])
-    trec_acc = np.sum(np.array(final_preds) == y_real) / len(y_real)
-
-  print(trec_acc)
+    trec_acc, reals, final_preds = test_trec(model, test_loader)
+  
   results = []
-  for y in final_preds:
-    results.append(idx2label[y])
-  report = f'Accuracy on dataset TREC 10 is {trec_acc}.\n' + '\n'.join(results)
+  for idx in range(len(final_preds)):
+    results.append((labels[reals[idx]], labels[final_preds[idx]]))
+  string = ''
+  for line in results:
+    string += f'real label: {line[0]}, predict label: {line[1]}\n'
+  string += f'TREC 10 accuracy: {trec_acc*100}%'
   with open(config['output_path'], 'w') as f:
-    f.write(report)
+    f.write(string)
 
+
+def main(preprocess=False):
+  args = cmdparser()
+  config = get_config(args.config)
+  if preprocess == True:
+    utils.preprocess(
+      config['raw_path'],
+      config['train_path'],
+      config['dev_path'],
+      config['label_path'],
+      config['stop_word_path'],
+      config['vocabulary_path']
+    )
+  labels = utils.load_labels(config['label_path'])
+  vocabulary = utils.load_vocabulary(config['vocabulary_path'])
+  stop_words = utils.load_stop_words(config['stop_word_path'])
+  
+  if args.dev:
+    train(config, vocabulary, labels, stop_words, save_path='', mode='dev')
+  elif args.train:
+    train(config, vocabulary, labels, stop_words, save_path=config['model_path'], mode='train')
+  elif args.test:
+    test(config, vocabulary, labels, stop_words, save_path=config['model_path'])
 
 if __name__ == "__main__":
-  args = cmdparser()
-  config_dict = get_config(args.config)
-
-  stopwords = utils.get_stopword(config_dict['stop_word_path'])
-
-  # get test data
-  test_x, test_y = utils.preprocessing(config_dict['trec_path'])
-  test_sents = utils.remove_stop(test_x, stopwords)
-
-  # get training data
-  x, y = utils.preprocessing(config_dict['data_path'])
-  voc, _ = utils.create_vocab(x, config_dict['stop_word_path'])
-  sents = utils.remove_stop(x, stopwords)
-
-  label2idx, idx2label = utils.get_label_dict(y)
-  trec_loader = DataLoader(test_sents, test_y, 0, False, 0, label2idx)
-
-  if args.dev:
-    dataloader = DataLoader(sents, y, int(config_dict['batch_size']), shuffle=True, test_ratio=0.1, label2idx=label2idx)
-    train(config_dict, voc, len(label2idx), dataloader, trec_loader, mode='dev')
-  if args.train:
-    dataloader = DataLoader(sents, y, int(config_dict['batch_size']), shuffle=False, test_ratio=0.0, label2idx=label2idx)
-    if int(config_dict['ensemble_size']) == 1:
-      train(config_dict, voc, len(label2idx), dataloader, trec_loader, save_path=config_dict['model_path'], mode='train')
-    else:
-      for i in range(int(config_dict['ensemble_size'])):
-        train(config_dict, voc, len(label2idx), dataloader, trec_loader, save_path=config_dict[f'model_path_{i+1}'], mode='train')
-  if args.test:
-    test(config_dict, voc, len(label2idx), trec_loader, idx2label)
-  if args.search:
-    dataloader = DataLoader(sents, y, int(config_dict['batch_size']), shuffle=False, test_ratio=0.0, label2idx=label2idx)
-    grid_search(config_dict, voc, len(label2idx), dataloader, trec_loader)
+  main(True)
