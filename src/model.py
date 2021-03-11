@@ -1,6 +1,6 @@
 from wordEmbed import RandomWordVec, PreTrainEmbedding
 from sentVect import BiLSTM
-from classifier import NeuralNetworkClassifier, EnsembleClassifier
+from classifier import NeuralNetworkClassifier, BowNeuralNetwork
 import utils
 
 import torch
@@ -9,7 +9,6 @@ import torch.nn as nn
 class QuestionClassifier(nn.Module):
   def __init__(
     self,
-    ensemble=1,
     bow=True, 
     bilstm=True,
     voc={},
@@ -21,6 +20,7 @@ class QuestionClassifier(nn.Module):
     bilstm_max_len=40,
     nn_input_dim=10,
     nn_hidden_dim_1=100,
+    nn_hidden_dim_2=200,
     nn_output_size=10
   ):
     super(QuestionClassifier, self).__init__()
@@ -43,7 +43,6 @@ class QuestionClassifier(nn.Module):
     self.use_bilstm = bilstm
     self.max_len = bilstm_max_len
     self.voc = voc
-    self.ens_size = ensemble
     if bilstm == True:
       self.bilstm = BiLSTM(
         bilstm_input_dim,
@@ -63,18 +62,18 @@ class QuestionClassifier(nn.Module):
             "bow": False
           }
           self.bilstm_emb = PreTrainEmbedding(**config)
-    if self.ens_size == 1:
+    if bow == True and bilstm == False:
+      self.classifier = BowNeuralNetwork(
+        nn_input_dim,
+        nn_hidden_dim_1,
+        nn_hidden_dim_2,
+        nn_output_size
+      )
+    else:
       self.classifier = NeuralNetworkClassifier(
         nn_input_dim,
         nn_hidden_dim_1,
         nn_output_size
-      )
-    else:
-      self.classifier = EnsembleClassifier(
-        nn_input_dim,
-        nn_hidden_dim_1,
-        nn_output_size,
-        ensemble
       )
   
   def forward(self, x):

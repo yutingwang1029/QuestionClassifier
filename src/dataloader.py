@@ -28,7 +28,8 @@ class DataLoader:
   
   def get_test_data(self):
     return self.test_x, get_tags(self.test_y, self.label2idx)
-  
+  def get_length(self):
+    return 2*self.length
   def next_batch(self):
     old_pointer = self.pointer
     if self.pointer + self.batch_size < self.length:

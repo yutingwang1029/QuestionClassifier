@@ -24,8 +24,8 @@ def cmdparser():
   
 def test_trec(model, trec_loader):
   test_x, test_y = trec_loader.get_all()
-  ret, y_preds = train_val(model, test_x, test_y)
-  return ret, y_preds
+  ret, y_preds, y_real = train_val(model, test_x, test_y)
+  return ret, y_preds, y_real
 
 def train_val(model, test_x, test_y):
   y_preds = list()
@@ -35,11 +35,10 @@ def train_val(model, test_x, test_y):
       predict = model([test_x[j]])
       y_preds.extend(predict.argmax(dim=1).numpy().tolist())
       y_real.extend([test_y[j]])
-  return np.sum(np.array(y_preds)==y_real)/len(y_real), y_preds
+  return np.sum(np.array(y_preds)==y_real)/len(y_real), y_preds, y_real
 
-def train(config, voc, label_num, dataloader, trec_loader, mode='dev'):
+def train(config, voc, label_num, dataloader, trec_loader, save_path='', mode='dev'):
   model = QuestionClassifier(
-    ensemble=int(config['ensemble_size']),
     bow=config['bow'] == 'True',
     bilstm=config['bilstm'] == 'True',
     voc=voc,
@@ -51,6 +50,7 @@ def train(config, voc, label_num, dataloader, trec_loader, mode='dev'):
     bilstm_max_len=config['bilstm_max_len'],
     nn_input_dim=config['nn_input_dim'],
     nn_hidden_dim_1=config['nn_hidden_dim_1'],
+    nn_hidden_dim_2=config['nn_hidden_dim_2'],
     nn_output_size=label_num
   )
   print(model)
@@ -72,7 +72,7 @@ def train(config, voc, label_num, dataloader, trec_loader, mode='dev'):
   best_model = copy.deepcopy(model.state_dict())
   model.train()
   for i in range(int(config['epoches'])):
-    batches = dataloader.length // int(config['batch_size'])
+    batches = dataloader.get_length() // int(config['batch_size'])
     for _j in range(batches):
       features, labels = dataloader.next_batch()
       labels = torch.LongTensor(labels)
@@ -82,7 +82,7 @@ def train(config, voc, label_num, dataloader, trec_loader, mode='dev'):
       loss.backward()
       optimizer.step()
       if mode == 'dev':
-        new_val_acc, _ = train_val(model, test_x, test_y)
+        new_val_acc, _, _ = train_val(model, test_x, test_y)
         if new_val_acc > best_val_acc:
           early_stopping = 0
           best_val_acc = new_val_acc
@@ -93,18 +93,18 @@ def train(config, voc, label_num, dataloader, trec_loader, mode='dev'):
       scheduler.step()
     print(f"----- epoch {i+1} -----")
     if mode == 'dev':
-      acc, _ = train_val(model, test_x, test_y)
-      acc_trec, _ = test_trec(model, trec_loader)
+      acc, _, _ = train_val(model, test_x, test_y)
+      acc_trec, _, _ = test_trec(model, trec_loader)
       best_trec_acc = acc_trec if acc_trec > best_trec_acc else best_trec_acc
       print(f"epoch {i+1} finished, validation acc: {acc}, TREC 10 acc: {acc_trec}")
     else:
-      acc_trec, _ = test_trec(model, trec_loader)
+      acc_trec, _, _ = test_trec(model, trec_loader)
       if best_trec_acc < acc_trec:
         best_trec_acc = acc_trec
         best_model = copy.deepcopy(model.state_dict())
       print(f"epoch {i+1} finished, TREC 10 acc: {acc_trec}, best TREC 10 acc: {best_trec_acc} lr: {scheduler.get_last_lr()[0]}")
-  if mode == 'train':
-    torch.save(best_model, config['model_path'])
+  if mode == 'train' and save_path != '':
+    torch.save(best_model, save_path)
   return best_model, best_trec_acc
 
 def cross_product(arr1, arr2):
@@ -121,25 +121,36 @@ def cross_product(arr1, arr2):
 
 def grid_search(config, voc, label_num, dataloader, trec_loader):
   lrs = [0.01, 0.011, 0.0115, 0.012]
-  bilstm_hiddens = [5, 10, 15, 20, 25, 30]
-  nn_input_dims = [50, 80, 100, 150, 200]
-  nn_hidden_dims = [20, 40, 50, 60, 100, 150]
-
-  t1 = cross_product(lrs, bilstm_hiddens)
-  t2 = cross_product(t1, nn_input_dims)
-  t3 = cross_product(t2, nn_hidden_dims)
+  # bilstm_hiddens = [5, 10, 15, 20, 25, 30]
+  # nn_input_dims = [50, 80, 100, 150, 200]
+  nn_hidden_dims = [50, 80, 100, 150, 200]
+  nn_hidden_dim2s = [50, 80, 100, 150, 200]
+  # nn_hidden_dims = [10 * i for i in range(1, 20)]
+  # t3 = nn_hidden_dims
+  # lrs = [0.01]
+  # bilstm_hiddens = [5]
+  # nn_input_dims = [50]
+  # nn_hidden_dims = [40,50]
+  t1 = lrs
+  # t1 = cross_product(lrs, bilstm_hiddens)
+  t2 = cross_product(t1, nn_hidden_dims)
+  t3 = cross_product(t2, nn_hidden_dim2s)
 
   result = []
   for setting in t3:
     new_config = copy.deepcopy(config)
     new_config['lr'] = setting[0]
-    new_config['bilstm_hidden'] = setting[1]
-    new_config['nn_input_dim'] = setting[2]
-    new_config['nn_hidden_dim'] = setting[3]
-
+    # new_config['bilstm_hidden_dim'] = setting[1]
+    # new_config['nn_input_dim'] = setting[2]
+    # new_config['nn_hidden_dim_1'] = setting[3]
+    new_config['nn_hidden_dim_1'] = setting[1]
+    new_config['nn_hidden_dim_2'] = setting[2]
+    # result.append([s for s in setting])
     result.append([s for s in setting])
 
-    _, trec_acc = train(new_config, voc, label_num, dataloader, trec_loader, mode='train')
+    new_dataloader = copy.deepcopy(dataloader)
+    new_trecloader = copy.deepcopy(trec_loader)
+    _, trec_acc = train(new_config, voc, label_num, new_dataloader, new_trecloader, mode='train')
     result[-1].append(trec_acc)
     print(result)
     title = 'lr,bilstm_hidden,nn_input_dim,nn_hidden_dim,acc\n'
@@ -152,7 +163,6 @@ def grid_search(config, voc, label_num, dataloader, trec_loader):
 
 def test(config, voc, label_num, trec_loader, idx2label):
   model = QuestionClassifier(
-    ensemble=int(config['ensemble_size']),
     bow=config['bow'] == 'True',
     bilstm=config['bilstm'] == 'True',
     voc=voc,
@@ -166,11 +176,37 @@ def test(config, voc, label_num, trec_loader, idx2label):
     nn_hidden_dim_1=config['nn_hidden_dim_1'],
     nn_output_size=label_num
   )
-  model.load_state_dict(torch.load(config['model_path']))
-  model.eval()
-  trec_acc, y_preds = test_trec(model, trec_loader)
+  if int(config['ensemble_size']) == 1:
+    model.load_state_dict(torch.load(config['model_path']))
+    model.eval()
+    trec_acc, final_preds, _ = test_trec(model, trec_loader)
+  else:
+    y_preds = []
+    y_real = []
+    final_preds = []
+    weight = []
+    for i in range(config['ensemble_size']):
+      model.load_state_dict(torch.load(config[f'model_path_{i+1}']))
+      model.eval()
+      trec_acc, y_pred_temp, y_real = test_trec(model, trec_loader)
+      for idx in range(len(y_pred_temp)):
+        if len(y_preds) <= idx:
+          y_preds.append([y_pred_temp[idx]])
+          weight.append([trec_acc])
+        else:
+          y_preds[idx].append(y_pred_temp[idx])
+          weight[idx].append(trec_acc)
+    y_real = np.array(y_real)
+    for idx in range(len(y_preds)):
+      votes = dict([[i, 0] for i in range(len(y_real))])
+      for j in range(len(y_preds[idx])):
+        votes[y_preds[idx][j]] += weight[idx][j]
+      final_preds.append(list(sorted(votes.items(), key=lambda x: x[1], reverse=True))[0][0])
+    trec_acc = np.sum(np.array(final_preds) == y_real) / len(y_real)
+
+  print(trec_acc)
   results = []
-  for y in y_preds:
+  for y in final_preds:
     results.append(idx2label[y])
   report = f'Accuracy on dataset TREC 10 is {trec_acc}.\n' + '\n'.join(results)
   with open(config['output_path'], 'w') as f:
@@ -200,7 +236,11 @@ if __name__ == "__main__":
     train(config_dict, voc, len(label2idx), dataloader, trec_loader, mode='dev')
   if args.train:
     dataloader = DataLoader(sents, y, int(config_dict['batch_size']), shuffle=False, test_ratio=0.0, label2idx=label2idx)
-    train(config_dict, voc, len(label2idx), dataloader, trec_loader, mode='train')
+    if int(config_dict['ensemble_size']) == 1:
+      train(config_dict, voc, len(label2idx), dataloader, trec_loader, save_path=config_dict['model_path'], mode='train')
+    else:
+      for i in range(int(config_dict['ensemble_size'])):
+        train(config_dict, voc, len(label2idx), dataloader, trec_loader, save_path=config_dict[f'model_path_{i+1}'], mode='train')
   if args.test:
     test(config_dict, voc, len(label2idx), trec_loader, idx2label)
   if args.search:
