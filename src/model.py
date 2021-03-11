@@ -1,7 +1,7 @@
 import torch
 
 from classifier import NeuralNetwork
-from sentVect import BOW, Bilstm
+from sentVect import BOW, Bilstm, BowBilstm
 
 class QuestionClassifier(torch.nn.Module):
   def __init__(
@@ -25,15 +25,25 @@ class QuestionClassifier(torch.nn.Module):
         embedding_dim,
         from_pretrain,
         pre_train_weight,
-        freeze)
+        freeze
+      )
     elif bow == False and bilstm == True:
       if from_pretrain:
-        self.emb = torch.nn.EmbeddingBag.from_pretrained(pre_train_weight, freeze=freeze)
+        emb = torch.nn.Embedding.from_pretrained(pre_train_weight, freeze=freeze)
       else:
-        self.emb = torch.nn.Embedding(vocab_size, embedding_dim)
+        emb = torch.nn.Embedding(vocab_size, embedding_dim)
       self.sent_vec = torch.nn.Sequential(
-        self.emb,
+        emb,
         Bilstm(vocab_size, embedding_dim, bilstm_hidden_dim)
+      )
+    elif bow == True and bilstm == True:
+      self.sent_vec = BowBilstm(
+        vocab_size,
+        embedding_dim,
+        from_pretrain,
+        pre_train_weight,
+        freeze,
+        bilstm_hidden_dim
       )
     self.classifier = NeuralNetwork(input_dim, hidden_dim, output_dim)
   

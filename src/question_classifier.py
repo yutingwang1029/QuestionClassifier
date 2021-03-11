@@ -12,6 +12,7 @@ global_config_path = './config.ini'
 
 def cmdparser():
   parser = argparse.ArgumentParser(description='Question Classifier')
+  parser.add_argument('--preprocess', action='store_true', help='preprocess the data before training')
   parser.add_argument('--dev', action="store_true", help='dev training mode without saving the model')
   parser.add_argument('--train', action="store_true", help='train and save the model')
   parser.add_argument('--test', action="store_true", help='test existing model')
@@ -62,12 +63,12 @@ def train(config, vocabulary, labels, stop_words, save_path='', mode='dev'):
   if mode == 'dev':
     train_set = utils.load_data(config['train_path'])
     val_set = utils.load_data(config['dev_path'])
-    val_loader = DataLoader(vocabulary, labels, stop_words, val_set)
+    val_loader = DataLoader(vocabulary, labels, stop_words, val_set, 1, False)
   else:
     train_set = utils.load_data(config['raw_path'])
   test_set = utils.load_data(config['test_path'])
-  train_loader = DataLoader(vocabulary, labels, stop_words, train_set)
-  test_loader = DataLoader(vocabulary, labels, stop_words, test_set)
+  train_loader = DataLoader(vocabulary, labels, stop_words, train_set, int(config['batch_size']), config['padding'] == 'True', int(config['padding_len']))
+  test_loader = DataLoader(vocabulary, labels, stop_words, test_set, 1, config['padding'] == 'True')
 
   for i in range(int(config['epochs'])):
     error = 0
@@ -93,7 +94,7 @@ def train(config, vocabulary, labels, stop_words, save_path='', mode='dev'):
     torch.save(model.state_dict(), save_path)
   return model
 
-def test(config, vocabulary, labels, stop_words, save_path=''):
+def test(config, vocabulary, labels, stop_words, save_path):
   if config['from_pretrain'] == 'True':
     pretrain_dict = utils.load_pre_train(config['pretrain_embedding_path'])
     pretrain_weight = utils.create_word_embedding(pretrain_dict, vocabulary)
@@ -116,12 +117,35 @@ def test(config, vocabulary, labels, stop_words, save_path=''):
     output_dim=len(labels)
   )
   test_set = utils.load_data(config['test_path'])
-  test_loader = DataLoader(vocabulary, labels, stop_words, test_set)
+  test_loader = DataLoader(vocabulary, labels, stop_words, test_set, 1, config['padding'] == 'True')
   if int(config['ensemble_size']) == 1:
-    model.load_state_dict(torch.load(config['model_path']))
+    model.load_state_dict(torch.load(save_path[0]))
     model.eval()
     trec_acc, reals, final_preds = test_trec(model, test_loader)
-  
+  else:
+    final_preds = []
+    weight = []
+    y_preds = []
+    for path in save_path:
+      model.load_state_dict(torch.load(path))
+      model.eval()
+      trec_acc, reals, preds = test_trec(model, test_loader)
+      for idx in range(len(preds)):
+        if len(y_preds) <= idx:
+          y_preds.append([preds[idx].numpy()[0]])
+          weight.append([trec_acc])
+        else:
+          y_preds[idx].append(preds[idx].numpy()[0])
+          weight[idx].append(trec_acc)
+    y_real = np.array(reals)
+    for idx in range(len(y_preds)):
+      # each class
+      votes = dict([[i, 0] for i in range(len(labels))])
+      for j in range(len(y_preds[idx])):
+        votes[y_preds[idx][j]] += weight[idx][j]
+      final_preds.append(list(sorted(votes.items(), key=lambda x: x[1], reverse=True))[0][0])
+    trec_acc = np.sum(np.array(final_preds) == y_real) / len(y_real)
+
   results = []
   for idx in range(len(final_preds)):
     results.append((labels[reals[idx]], labels[final_preds[idx]]))
@@ -133,10 +157,10 @@ def test(config, vocabulary, labels, stop_words, save_path=''):
     f.write(string)
 
 
-def main(preprocess=False):
+def main():
   args = cmdparser()
   config = get_config(args.config)
-  if preprocess == True:
+  if args.preprocess:
     utils.preprocess(
       config['raw_path'],
       config['train_path'],
@@ -152,9 +176,17 @@ def main(preprocess=False):
   if args.dev:
     train(config, vocabulary, labels, stop_words, save_path='', mode='dev')
   elif args.train:
-    train(config, vocabulary, labels, stop_words, save_path=config['model_path'], mode='train')
+    if int(config['ensemble_size']) == 1:
+      train(config, vocabulary, labels, stop_words, save_path=config['model_path'], mode='train')
+    else:
+      for i in range(int(config['ensemble_size'])):
+        train(config, vocabulary, labels, stop_words, save_path=config[f'model_path_{i+1}'], mode='train')
   elif args.test:
-    test(config, vocabulary, labels, stop_words, save_path=config['model_path'])
-
+    if int(config['ensemble_size']) == 1:
+      test(config, vocabulary, labels, stop_words, save_path=[config['model_path']])
+    else:
+      test_paths = [config[f'model_path_{i+1}'] for i in range(int(config['ensemble_size']))]
+      test(config, vocabulary, labels, stop_words, save_path=test_paths)
+      
 if __name__ == "__main__":
-  main(True)
+  main()
